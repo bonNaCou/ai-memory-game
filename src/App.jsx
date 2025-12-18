@@ -1,87 +1,129 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Header from "./components/Header";
 import GameBoard from "./components/GameBoard";
-import cardsData from "./data/cards";
-import "./styles/index.css";
+import ScoreBoard from "./components/ScoreBoard";
+import { cardsData } from "./data/cards";
+import "./App.css";
+
+const difficulties = {
+  Easy: { pairs: 4, columns: 4 },
+  Medium: { pairs: 6, columns: 4 },
+  Hard: { pairs: 8, columns: 4 },
+};
 
 function shuffle(array) {
   return [...array].sort(() => Math.random() - 0.5);
 }
 
-function App() {
-  const [cards, setCards] = useState(() => shuffle(cardsData));
-  const [flippedCards, setFlippedCards] = useState([]);
-  const [matchedCards, setMatchedCards] = useState([]);
-  const [isChecking, setIsChecking] = useState(false);
+export default function App() {
+  const [difficulty, setDifficulty] = useState("Easy");
+  const [stage, setStage] = useState(1);
   const [moves, setMoves] = useState(0);
+  const [flipped, setFlipped] = useState([]);
+  const [matched, setMatched] = useState([]);
+  const [cards, setCards] = useState([]);
 
-  const handleCardClick = (index) => {
-    if (
-      isChecking ||
-      flippedCards.includes(index) ||
-      matchedCards.includes(index)
-    ) {
-      return;
-    }
+  // 🔊 SOUND REFS (CORRECT WAY)
+  const flipSound = useRef(null);
+  const matchSound = useRef(null);
+  const winSound = useRef(null);
 
-    const newFlipped = [...flippedCards, index];
-    setFlippedCards(newFlipped);
-
-    if (newFlipped.length === 2) {
-      setIsChecking(true);
-      setMoves((m) => m + 1);
-    }
-  };
+  // Load sounds AFTER mount
+  useEffect(() => {
+    flipSound.current = new Audio("/sounds/flip.mp3");
+    matchSound.current = new Audio("/sounds/match.mp3");
+    winSound.current = new Audio("/sounds/win.mp3");
+  }, []);
 
   useEffect(() => {
-    if (flippedCards.length !== 2) return;
+    startGame();
+  }, [difficulty, stage]);
 
-    const [first, second] = flippedCards;
+  function startGame() {
+    const { pairs } = difficulties[difficulty];
+    const selected = shuffle(cardsData).slice(0, pairs);
+    const deck = shuffle(
+      [...selected, ...selected].map((c, i) => ({
+        ...c,
+        uid: `${c.id}-${i}`,
+      }))
+    );
 
-    if (cards[first].emoji === cards[second].emoji) {
-      setMatchedCards((prev) => [...prev, first, second]);
-      setFlippedCards([]);
-      setIsChecking(false);
-    } else {
-      setTimeout(() => {
-        setFlippedCards([]);
-        setIsChecking(false);
-      }, 900);
-    }
-  }, [flippedCards, cards]);
-
-  const resetGame = () => {
-    setCards(shuffle(cardsData));
-    setFlippedCards([]);
-    setMatchedCards([]);
+    setCards(deck);
+    setFlipped([]);
+    setMatched([]);
     setMoves(0);
-    setIsChecking(false);
-  };
+  }
 
-  const hasWon = matchedCards.length === cards.length;
+  function playSound(sound) {
+    if (!sound) return;
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
+  }
+
+  function handleCardClick(card) {
+    if (
+      flipped.length === 2 ||
+      flipped.includes(card.uid) ||
+      matched.includes(card.uid)
+    )
+      return;
+
+    playSound(flipSound.current);
+    setFlipped(prev => [...prev, card.uid]);
+  }
+
+  useEffect(() => {
+    if (flipped.length === 2) {
+      setMoves(m => m + 1);
+
+      const [a, b] = flipped;
+      const cardA = cards.find(c => c.uid === a);
+      const cardB = cards.find(c => c.uid === b);
+
+      if (cardA.id === cardB.id) {
+        playSound(matchSound.current);
+        setMatched(prev => [...prev, a, b]);
+        setFlipped([]);
+      } else {
+        setTimeout(() => setFlipped([]), 800);
+      }
+    }
+  }, [flipped]);
+
+  useEffect(() => {
+    if (matched.length === cards.length && cards.length > 0) {
+      playSound(winSound.current);
+      setTimeout(() => setStage(s => s + 1), 1200);
+    }
+  }, [matched]);
 
   return (
     <div className="app">
-      <h1>AI Memory Game 🎮</h1>
-      <p>Moves: {moves}</p>
+      <Header
+        difficulty={difficulty}
+        setDifficulty={setDifficulty}
+        stage={stage}
+        moves={moves}
+      />
 
-      {hasWon && (
-        <div className="win">
-          <h2>🎉 You Win!</h2>
-          <button onClick={resetGame}>Play Again</button>
+      {matched.length === cards.length && cards.length > 0 && (
+        <div className="win-banner">
+          🎉 Stage {stage} Complete!
+          <button onClick={startGame}>Play Again</button>
         </div>
       )}
 
-      <GameBoard
-        cards={cards}
-        flipped={[...flippedCards, ...matchedCards]}
-        handleCardClick={handleCardClick}
-      />
+      <div className="board-wrapper">
+        <GameBoard
+          cards={cards}
+          flipped={[...flipped, ...matched]}
+          handleCardClick={handleCardClick}
+          columns={difficulties[difficulty].columns}
+        />
+      </div>
 
-      <button onClick={resetGame} className="reset">
-        Restart Game
-      </button>
+      <ScoreBoard onRestart={startGame} />
     </div>
   );
 }
-
-export default App;

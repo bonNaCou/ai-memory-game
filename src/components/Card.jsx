@@ -1,9 +1,10 @@
-function Card({ card, handleClick, isFlipped }) {
+export default function Card({ card, isFlipped, handleClick }) {
   return (
-    <div className="card" onClick={handleClick}>
+    <div
+      className={`card ${isFlipped ? "flipped" : ""}`}
+      onClick={handleClick}
+    >
       {isFlipped ? card.emoji : "❓"}
     </div>
   );
 }
-
-export default Card;

@@ -1,18 +1,24 @@
 import Card from "./Card";
 
-function GameBoard({ cards, flipped, handleCardClick }) {
+export default function GameBoard({
+  cards,
+  flipped,
+  handleCardClick,
+  columns,
+}) {
   return (
-    <div className="grid">
-      {cards.map((card, index) => (
+    <div
+      className="game-board"
+      style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+    >
+      {cards.map(card => (
         <Card
-          key={index}
+          key={card.uid}
           card={card}
-          isFlipped={flipped.includes(index)}
-          handleClick={() => handleCardClick(index)}
+          isFlipped={flipped.includes(card.uid)}
+          handleClick={() => handleCardClick(card)}
         />
       ))}
     </div>
   );
 }
-
-export default GameBoard;
